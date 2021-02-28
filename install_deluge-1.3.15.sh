@@ -11,6 +11,7 @@ echo ""
 
 RED='\033[0;31m'
 GRN='\033[0;32m'
+YEL='\033[1;33m'
 NC='\033[0m'
 
 if [ "$EUID" -ne 0 ]
@@ -20,18 +21,21 @@ then
 fi
 
 # Check if Deluge 1.3.15 is already installed
-INSTALLED=$(deluge --version | head -n 1 | cut -d' ' -f2)
-if [[ $INSTALLED == "1.3.15" ]]
+if command -v deluge &> /dev/null
 then
-  printf "${RED}Version 1.3.15 is already installed!${NC}\n\n"
-  exit
+  INSTALLED=$(deluge --version | head -n 1 | cut -d' ' -f2)
+  if [[ $INSTALLED == "1.3.15" ]]
+  then
+    printf "${RED}Version 1.3.15 is already installed!${NC}\n\n"
+    exit
+  fi
 fi
 
 printf "${GRN}Switching to a temporary directory...${NC}\n"
 TEMP_DIR=$(mktemp -d -t dlg_inst-XXXXXXXXXX)
 cd $TEMP_DIR
 
-printf "${GRN}Downloading the required files...${NC}\n"
+printf "\n${GRN}Downloading the required files...${NC}\n"
 wget -q --show-progress --progress=bar:force http://archive.ubuntu.com/ubuntu/pool/universe/libt/libtorrent-rasterbar/python-libtorrent_1.1.5-1build1_amd64.deb
 wget -q --show-progress --progress=bar:force http://archive.ubuntu.com/ubuntu/pool/universe/libt/libtorrent-rasterbar/libtorrent-rasterbar9_1.1.5-1build1_amd64.deb
 wget -q --show-progress --progress=bar:force http://archive.ubuntu.com/ubuntu/pool/main/b/boost1.65.1/libboost-system1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
@@ -47,10 +51,13 @@ wget -q --show-progress --progress=bar:force http://archive.ubuntu.com/ubuntu/po
 wget -q --show-progress --progress=bar:force http://archive.ubuntu.com/ubuntu/pool/universe/d/deluge/deluge-gtk_1.3.15-2_all.deb
 wget -q --show-progress --progress=bar:force http://archive.ubuntu.com/ubuntu/pool/universe/d/deluge/deluge_1.3.15-2_all.deb
 
-printf "${GRN}Installing packages...${NC}\n"
-apt install -y ./*.deb
+printf "\n${GRN}Setting ownership of files for apt...${NC}\n"
+sudo chown _apt -R $TEMP_DIR
 
-printf "${GRN}Locking version to 1.3.15...${NC}\n"
+printf "\n${GRN}Installing packages...${NC}\n"
+sudo apt install -qq -y ./*.deb
+
+printf "\n${GRN}Locking version to 1.3.15...${NC}\n"
 cat <<EOF | sudo tee /etc/apt/preferences.d/pin-deluge
 Package: deluge
 Pin: version 1.3.15-2
@@ -69,5 +76,18 @@ Pin: version 1.1.5-1build1
 Pin-Priority: 1337
 EOF
 
-printf "${GRN}Cleaning up...${NC}\n"
-rm -rf $TEMP_DIR
+printf "\n${GRN}Cleaning up files...${NC}\n"
+cd /
+sudo rm -R $TEMP_DIR
+
+# Check if Deluge 1.3.15 is installed
+if command -v deluge &> /dev/null
+then
+  INSTALLED=$(deluge --version | head -n 1 | cut -d' ' -f2)
+  if [[ $INSTALLED == "1.3.15" ]]
+  then
+    printf "\n${YEL}Deluge 1.3.15 has been succefully installed!${NC}\n\n"
+    exit
+  fi
+fi
+printf "\n${RED}Deluge 1.3.15 failed to install!${NC}\n\n"
